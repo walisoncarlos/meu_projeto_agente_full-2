@@ -1,68 +1,61 @@
+import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import streamlit as st
 
-# --- Função para carregar dados ---
-def carregar_dados(arquivo):
-    """Carrega um arquivo CSV e retorna um DataFrame."""
-    try:
-        df = pd.read_csv(arquivo)
-        st.success("✅ Arquivo carregado com sucesso!")
-        return df
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar o arquivo: {e}")
-        return None
+# Função para análise exploratória de dados
+def eda_dashboard(df):
+    st.header("📊 Análise Exploratória de Dados (EDA)")
 
-# --- Mostrar informações básicas ---
-def info_basica(df):
-    """Mostra informações básicas do DataFrame."""
-    st.subheader("📊 Informações Básicas")
-    st.write(f"**Número de Linhas:** {df.shape[0]}")
-    st.write(f"**Número de Colunas:** {df.shape[1]}")
-    st.write("**Colunas:**", list(df.columns))
+    # Exibir as 5 primeiras linhas
+    st.subheader("👀 Visualização Inicial")
+    st.dataframe(df.head())
+
+    # Mostrar dimensões e tipos
+    st.subheader("📏 Dimensões e Tipos de Dados")
+    st.write(f"**Linhas:** {df.shape[0]} | **Colunas:** {df.shape[1]}")
     st.write("**Tipos de Dados:**")
-    st.dataframe(df.dtypes.astype(str))
+    st.write(df.dtypes)
 
-# --- Estatísticas descritivas ---
-def estatisticas(df):
-    """Exibe estatísticas descritivas do DataFrame."""
+    # Estatísticas descritivas
     st.subheader("📈 Estatísticas Descritivas")
     try:
-        st.dataframe(df.describe(numeric_only=True).round(4))
-    except Exception as e:
-        st.error(f"Erro ao calcular estatísticas: {e}")
+        stats = df.describe(numeric_only=True).round(4)
+    except Exception:
+        # fallback caso alguma versão do pandas cause erro
+        stats = df.describe().round(4)
+    st.dataframe(stats)
 
-# --- Mostrar valores nulos ---
-def valores_nulos(df):
-    """Mostra a quantidade de valores nulos por coluna."""
-    st.subheader("⚠️ Valores Nulos")
-    st.dataframe(df.isnull().sum())
+    # Contagem de valores nulos
+    st.subheader("❌ Valores Nulos por Coluna")
+    missing = df.isnull().sum()
+    st.dataframe(missing[missing > 0])
 
-# --- Gráfico de histograma ---
-def histograma(df, coluna):
-    """Gera um histograma de uma coluna numérica."""
-    st.subheader(f"📊 Histograma - {coluna}")
-    fig, ax = plt.subplots()
-    try:
-        series = pd.to_numeric(df[coluna], errors='coerce').dropna()
-        series.hist(ax=ax, bins=30)
-        ax.set_xlabel(coluna)
-        ax.set_ylabel('Frequência')
-        st.pyplot(fig)
-    except Exception as e:
-        st.error(f"Erro ao gerar histograma: {e}")
+    # Selecionar coluna para histograma
+    st.subheader("📉 Distribuição de Variáveis")
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    if len(numeric_cols) > 0:
+        coluna = st.selectbox("Selecione uma coluna numérica:", numeric_cols)
+        if coluna:
+            fig, ax = plt.subplots()
+            df[coluna].dropna().hist(bins=30, ax=ax)
+            ax.set_title(f"Histograma - {coluna}")
+            ax.set_xlabel(coluna)
+            ax.set_ylabel("Frequência")
+            st.pyplot(fig)
+    else:
+        st.info("Nenhuma coluna numérica disponível para histograma.")
 
-# --- Mapa de correlação ---
-def mapa_correlacao(df):
-    """Gera um mapa de correlação entre variáveis numéricas."""
-    st.subheader("🔗 Mapa de Correlação")
-    try:
-        corr = df.corr(numeric_only=True)
-        fig, ax = plt.subplots(figsize=(8,6))
-        cax = ax.matshow(corr, cmap=plt.cm.coolwarm)
-        plt.xticks(range(len(corr.columns)), corr.columns, rotation=90)
-        plt.yticks(range(len(corr.columns)), corr.columns)
+    # Mapa de correlação
+    if len(numeric_cols) > 1:
+        st.subheader("🔗 Mapa de Correlação")
+        fig, ax = plt.subplots(figsize=(6, 4))
+        corr = df[numeric_cols].corr()
+        cax = ax.matshow(corr, cmap='coolwarm')
         fig.colorbar(cax)
+        ax.set_xticks(range(len(numeric_cols)))
+        ax.set_yticks(range(len(numeric_cols)))
+        ax.set_xticklabels(numeric_cols, rotation=90)
+        ax.set_yticklabels(numeric_cols)
         st.pyplot(fig)
-    except Exception as e:
-        st.error(f"Erro ao gerar mapa de correlação: {e}")
+    else:
+        st.info("Não há colunas numéricas suficientes para correlação.")
